@@ -1,0 +1,12 @@
+## Interface: 11100
+## Title: ChatThrottleLib
+## Notes: [Version 1] Embeddable chat throttling library with traffic shaping and priorities
+## Author: Mikk of Bloodhoof-EU
+## Version: 1
+## eMail: dpsgnome@mail.com
+## DefaultState: Enabled
+## LoadOnDemand: 0
+## SavedVariables: 
+## SavedVariablesPerCharacter: 
+
+ChatThrottleLib.lua
