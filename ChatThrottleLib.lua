@@ -1,17 +1,20 @@
 --
 -- ChatThrottleLib by Mikk
 --
--- Will install hooks for SendChatMessage and SendAdd[Oo]nMessage to prevent 
--- chat flood from kicking players off the server.
+-- Manages AddOn chat output to keep player from getting kicked off.
 --
--- Also contains ChatThrottleLib.SendChatMessage/.SendAddonMessage extensions
--- that accept a Priority ("BULK", "NORMAL", "ALERT") as well as prefix for
--- SendChatMessage.
+-- ChatThrottleLib.SendChatMessage/.SendAddonMessage functions that accept 
+-- a Priority ("BULK", "NORMAL", "ALERT") as well as prefix for SendChatMessage.
 --
 -- Priorities get an equal share of available bandwidth when fully loaded.
 -- Communication channels are separated on extension+chattype+destination and
 -- get round-robinned. (Destination only matters for whispers and channels,
 -- obviously)
+--
+-- Can optionally install hooks for SendChatMessage and SendAdd[Oo]nMessage 
+-- to prevent addons not using this library from overflowing the output rate.
+-- Note however that this is somewhat controversional.
+--
 --
 -- Fully embeddable library. Just copy this file into your addon directory,
 -- add it to the .toc, and it's done.
@@ -19,9 +22,9 @@
 -- Can run as a standalone addon also, but, really, just embed it! :-)
 --
 
-local CTL_VERSION = 1
+local CTL_VERSION = 2
 
-local MAX_CPS = 4000
+local MAX_CPS = 1000			-- 2000 seems to be safe if NOTHING ELSE is happening. let's call it 1000.
 local MSG_OVERHEAD = 40		-- Guesstimate overhead for sending a message; source+dest+chattype+protocolstuff
 
 
@@ -127,22 +130,19 @@ end
 
 -----------------------------------------------------------------------
 -- ChatThrottleLib:Init
--- Hook SendChatMessage/SendAddonMessage, initialize queues, etc
+-- Initialize queues, set up frame for OnUpdate, etc
 
 
 function ChatThrottleLib:Init()	
 	
-	-- Hook SendChatMessage
+	-- Remember original SendChatMessage in case the addon wants to hook
 	if(not self.Orig_SendChatMessage) then
 		self.Orig_SendChatMessage = SendChatMessage;
-		SendChatMessage = function(a1,a2,a3,a4) return ChatThrottleLib:SendChatMessage("NORMAL", "", a1,a2,a3,a4) end
 	end
 	
-	-- Hook SendAddonMessage (SendAddOnMessage too in case Slouken changes his mind and fixes the capitalization)
+	-- ... and SendAddonMessage (SendAddOnMessage too in case Slouken changes his mind and fixes the capitalization)
 	if(not self.Orig_SendAddonMessage) then
 		self.Orig_SendAddonMessage = SendAddOnMessage or SendAddonMessage;
-		SendAddonMessage = function(a1,a2,a3,a4) return ChatThrottleLib:SendAddonMessage("NORMAL", a1,a2,a3,a4) end
-		SendAddOnMessage = SendAddonMessage;
 	end
 
 	-- Set up queues
@@ -164,6 +164,31 @@ function ChatThrottleLib:Init()
 	
 end
 
+
+-----------------------------------------------------------------------
+-- ChatThrottleLib:Hook
+--
+-- Call this if you want ALL system chat output to go via ChatThrottleLib
+-- to prevent AddOns not aware of the lib from outputting masses of
+-- chat "on the side" and overflowing the output rate limit.
+--
+-- Note that this is somewhat controversial.
+--
+
+function ChatThrottleLib:Hook()
+	-- Hook SendChatMessage
+	if(not self.bHooked_SendChatMessage) then
+		self.bHooked_SendChatMessage = true;
+		SendChatMessage = function(a1,a2,a3,a4) return ChatThrottleLib:SendChatMessage("NORMAL", "", a1,a2,a3,a4) end
+	end
+	
+	-- Hook SendAddonMessage (SendAddOnMessage too in case Slouken changes his mind and fixes the capitalization)
+	if(not self.bHooked_SendAddonMessage) then
+		self.bHooked_SendAddonMessage = true;
+		SendAddonMessage = function(a1,a2,a3,a4) return ChatThrottleLib:SendAddonMessage("NORMAL", a1,a2,a3,a4) end
+		SendAddOnMessage = SendAddonMessage;
+	end
+end
 
 
 -----------------------------------------------------------------------
