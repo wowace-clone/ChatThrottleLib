@@ -22,7 +22,7 @@
 -- Can run as a standalone addon also, but, really, just embed it! :-)
 --
 
-local CTL_VERSION = 2
+local CTL_VERSION = 3
 
 local MAX_CPS = 1000			-- 2000 seems to be safe if NOTHING ELSE is happening. let's call it 1000.
 local MSG_OVERHEAD = 40		-- Guesstimate overhead for sending a message; source+dest+chattype+protocolstuff
@@ -85,7 +85,7 @@ end
 -- Recycling bin for pipes (kept in a linked list because that's 
 -- how they're worked with in the rotating rings; just reusing members)
 
-ChatThrottleLib.PipeBin = {}
+ChatThrottleLib.PipeBin = { count=0 }
 
 function ChatThrottleLib.PipeBin:Put(pipe)
 	for i=getn(pipe),1,-1 do
@@ -94,6 +94,7 @@ function ChatThrottleLib.PipeBin:Put(pipe)
 	pipe.prev = nil;
 	pipe.next = self.list;
 	self.list = pipe;
+	self.count = self.count+1;
 end
 
 function ChatThrottleLib.PipeBin:Get()
@@ -101,9 +102,28 @@ function ChatThrottleLib.PipeBin:Get()
 		local ret = self.list;
 		self.list = ret.next;
 		ret.next=nil;
+		self.count = self.count - 1;
 		return ret;
 	end
 	return {};
+end
+
+function ChatThrottleLib.PipeBin:Tidy()
+	if(self.count < 25) then
+		return;
+	end
+		
+	if(self.count > 100) then
+		n=self.count-90;
+	else
+		n=10;
+	end
+	for i=2,n do
+		self.list = self.list.next;
+	end
+	local delme = self.list;
+	self.list = self.list.next;
+	delme.next = nil;
 end
 
 
@@ -125,7 +145,20 @@ function ChatThrottleLib.MsgBin:Get()
 	return {};
 end
 
-
+function ChatThrottleLib.MsgBin:Tidy()
+	if(getn(self)<50) then
+		return;
+	end
+	if(getn(self)>150) then	 -- "can't happen" but ...
+		for n=getn(self),120,-1 do
+			tremove(self,n);
+		end
+	else
+		for n=getn(self),getn(self)-20,-1 do
+			tremove(self,n);
+		end
+	end
+end
 
 
 -----------------------------------------------------------------------
@@ -208,6 +241,7 @@ function ChatThrottleLib:Despool(Prio)
 		end
 		Prio.avail = Prio.avail - msg.nSize;
 		msg.f(msg[1], msg[2], msg[3], msg[4]);
+		self.MsgBin:Put(msg);
 	end
 end
 
@@ -235,20 +269,23 @@ function ChatThrottleLib:OnUpdate()
 			Prio.avail = 0;
 		end
 		self.Frame:Hide();
-		return;
-	end
-
-	avail=avail/n;
+	else
 	
-	for prioname,Prio in pairs(self.Prio) do
-		if(Prio.Ring.pos or Prio.avail<0) then
-			Prio.avail = Prio.avail + avail;
-			if(Prio.Ring.pos and Prio.avail>Prio.Ring.pos[1].nSize) then
-				self:Despool(Prio);
+		avail=avail/n;
+		
+		for prioname,Prio in pairs(self.Prio) do
+			if(Prio.Ring.pos or Prio.avail<0) then
+				Prio.avail = Prio.avail + avail;
+				if(Prio.Ring.pos and Prio.avail>Prio.Ring.pos[1].nSize) then
+					self:Despool(Prio);
+				end
 			end
 		end
+	
 	end
 	
+	self.MsgBin:Tidy();
+	self.PipeBin:Tidy();
 end
 
 
