@@ -22,7 +22,7 @@
 -- Can run as a standalone addon also, but, really, just embed it! :-)
 --
 
-local CTL_VERSION = 3
+local CTL_VERSION = 4
 
 local MAX_CPS = 1000			-- 2000 seems to be safe if NOTHING ELSE is happening. let's call it 1000.
 local MSG_OVERHEAD = 40		-- Guesstimate overhead for sending a message; source+dest+chattype+protocolstuff
@@ -168,22 +168,17 @@ end
 
 function ChatThrottleLib:Init()	
 	
-	-- Remember original SendChatMessage in case the addon wants to hook
-	if(not self.Orig_SendChatMessage) then
-		self.Orig_SendChatMessage = SendChatMessage;
-	end
-	
-	-- ... and SendAddonMessage (SendAddOnMessage too in case Slouken changes his mind and fixes the capitalization)
-	if(not self.Orig_SendAddonMessage) then
-		self.Orig_SendAddonMessage = SendAddOnMessage or SendAddonMessage;
-	end
-
 	-- Set up queues
 	if(not self.Prio) then
 		self.Prio = {}
 		self.Prio["ALERT"] = { ByName={}, Ring = Ring:New(), avail=0 };
 		self.Prio["NORMAL"] = { ByName={}, Ring = Ring:New(), avail=0 };
 		self.Prio["BULK"] = { ByName={}, Ring = Ring:New(), avail=0 };
+	end
+	
+	-- Added in v4: total send counters per priority
+	for _,Prio in self.Prio do
+		Prio.nTotalSent = Prio.nTotalSent or 0;
 	end
 	
 	-- Set up a frame to get OnUpdate events
@@ -197,31 +192,6 @@ function ChatThrottleLib:Init()
 	
 end
 
-
------------------------------------------------------------------------
--- ChatThrottleLib:Hook
---
--- Call this if you want ALL system chat output to go via ChatThrottleLib
--- to prevent AddOns not aware of the lib from outputting masses of
--- chat "on the side" and overflowing the output rate limit.
---
--- Note that this is somewhat controversial.
---
-
-function ChatThrottleLib:Hook()
-	-- Hook SendChatMessage
-	if(not self.bHooked_SendChatMessage) then
-		self.bHooked_SendChatMessage = true;
-		SendChatMessage = function(a1,a2,a3,a4) return ChatThrottleLib:SendChatMessage("NORMAL", "", a1,a2,a3,a4) end
-	end
-	
-	-- Hook SendAddonMessage (SendAddOnMessage too in case Slouken changes his mind and fixes the capitalization)
-	if(not self.bHooked_SendAddonMessage) then
-		self.bHooked_SendAddonMessage = true;
-		SendAddonMessage = function(a1,a2,a3,a4) return ChatThrottleLib:SendAddonMessage("NORMAL", a1,a2,a3,a4) end
-		SendAddOnMessage = SendAddonMessage;
-	end
-end
 
 
 -----------------------------------------------------------------------
@@ -241,6 +211,7 @@ function ChatThrottleLib:Despool(Prio)
 		end
 		Prio.avail = Prio.avail - msg.nSize;
 		msg.f(msg[1], msg[2], msg[3], msg[4]);
+		Prio.nTotalSent = Prio.nTotalSent + msg.nSize;
 		self.MsgBin:Put(msg);
 	end
 end
@@ -311,13 +282,14 @@ end
 
 
 function ChatThrottleLib:SendChatMessage(prio, prefix,   text, chattype, language, destination)
-	assert(self and prio and prefix and text and chattype and (prio=="NORMAL" or prio=="BULK" or prio=="ALERT"),
-		'Usage: ChatThrottleLib:SendChatMessage("{BULK|NORMAL|ALERT}", "prefix", "text", "chattype"[, "language"[, "destination"]]');
+	if(not (self and prio and prefix and text and (prio=="NORMAL" or prio=="BULK" or prio=="ALERT") ) ) then
+		error('Usage: ChatThrottleLib:SendChatMessage("{BULK||NORMAL||ALERT}", "prefix", "text"[, "chattype"[, "language"[, "destination"]]]', 0);
+	end
 	
 	msg=self.MsgBin:Get();
-	msg.f=self.Orig_SendChatMessage
+	msg.f=SendChatMessage
 	msg[1]=text;
-	msg[2]=chattype;
+	msg[2]=chattype or "SAY";
 	msg[3]=language;
 	msg[4]=destination;
 	table.setn(msg,4);
@@ -328,11 +300,12 @@ end
 
 
 function ChatThrottleLib:SendAddonMessage(prio,   prefix, text, chattype)
-	assert(self and prio and prefix and text and chattype and (prio=="NORMAL" or prio=="BULK" or prio=="ALERT"),
-		'Usage: ChatThrottleLib:SendAddonMessage("{BULK|NORMAL|ALERT}", "prefix", "text", "chattype")');
+	if(not (self and prio and prefix and text and chattype and (prio=="NORMAL" or prio=="BULK" or prio=="ALERT") ) ) then
+		error('Usage: ChatThrottleLib:SendAddonMessage("{BULK||NORMAL||ALERT}", "prefix", "text", "chattype")', 0);
+	end
 	
 	msg=self.MsgBin:Get();
-	msg.f=self.Orig_SendAddonMessage;
+	msg.f=SendAddonMessage;
 	msg[1]=prefix;
 	msg[2]=text;
 	msg[3]=chattype;
@@ -360,3 +333,6 @@ if(WOWB_VER) then
 	ChatThrottleLib.Frame:RegisterEvent("CHAT_MSG_SAY");
 end
 ]]
+
+
+
