@@ -22,7 +22,7 @@
 -- Can run as a standalone addon also, but, really, just embed it! :-)
 --
 
-local CTL_VERSION = 4
+local CTL_VERSION = 5
 
 local MAX_CPS = 1000			-- 2000 seems to be safe if NOTHING ELSE is happening. let's call it 1000.
 local MSG_OVERHEAD = 40		-- Guesstimate overhead for sending a message; source+dest+chattype+protocolstuff
@@ -292,7 +292,7 @@ function ChatThrottleLib:SendChatMessage(prio, prefix,   text, chattype, languag
 	msg[2]=chattype or "SAY";
 	msg[3]=language;
 	msg[4]=destination;
-	table.setn(msg,4);
+	msg.n = 4
 	msg.nSize = strlen(text) + MSG_OVERHEAD;
 
 	self:Enqueue(prio, prefix.."/"..chattype.."/"..(destination or ""), msg);
@@ -309,7 +309,7 @@ function ChatThrottleLib:SendAddonMessage(prio,   prefix, text, chattype)
 	msg[1]=prefix;
 	msg[2]=text;
 	msg[3]=chattype;
-	setn(msg,3);
+	msg.n = 3
 	msg.nSize = strlen(text) + MSG_OVERHEAD;
 	
 	self:Enqueue(prio, prefix.."/"..chattype, msg);
