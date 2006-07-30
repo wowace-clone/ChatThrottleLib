@@ -22,11 +22,12 @@
 -- Can run as a standalone addon also, but, really, just embed it! :-)
 --
 
-local CTL_VERSION = 5
+local CTL_VERSION = 6
 
 local MAX_CPS = 1000			-- 2000 seems to be safe if NOTHING ELSE is happening. let's call it 1000.
 local MSG_OVERHEAD = 40		-- Guesstimate overhead for sending a message; source+dest+chattype+protocolstuff
 
+local BURST = 8000				-- WoW's server buffer seems to be about 32KB. Let's use 25% of it for our lib.
 
 if(ChatThrottleLib and ChatThrottleLib.version>=CTL_VERSION) then
 	-- There's already a newer (or same) version loaded. Buh-bye.
@@ -40,7 +41,6 @@ if(not ChatThrottleLib) then
 end
 
 ChatThrottleLib.version=CTL_VERSION;
-
 
 
 -----------------------------------------------------------------------
@@ -176,22 +176,39 @@ function ChatThrottleLib:Init()
 		self.Prio["BULK"] = { ByName={}, Ring = Ring:New(), avail=0 };
 	end
 	
-	-- Added in v4: total send counters per priority
+	-- v4: total send counters per priority
 	for _,Prio in self.Prio do
 		Prio.nTotalSent = Prio.nTotalSent or 0;
 	end
+	
+	self.avail = self.avail or 0;							-- v5
+	self.nTotalSent = self.nTotalSent or 0;		-- v5
+
 	
 	-- Set up a frame to get OnUpdate events
 	if(not self.Frame) then
 		self.Frame = CreateFrame("Frame");
 		self.Frame:Hide();
 	end
+	self.Frame.Show = self.Frame.Show; -- cache for speed
+	self.Frame.Hide = self.Frame.Hide; -- cache for speed
 	self.Frame:SetScript("OnUpdate", self.OnUpdate);
 	self.OnUpdateDelay=0;
-	self.LastDespool=GetTime();
+	self.LastAvailUpdate=GetTime();
 	
 end
 
+
+-----------------------------------------------------------------------
+-- ChatThrottleLib:UpdateAvail
+-- Update self.avail with how much bandwidth is currently available
+
+function ChatThrottleLib:UpdateAvail()
+	local now = GetTime();
+	self.avail = min(BURST, self.avail + (MAX_CPS * (now-self.LastAvailUpdate)));
+	self.LastAvailUpdate = now;
+	return self.avail;
+end
 
 
 -----------------------------------------------------------------------
@@ -220,41 +237,49 @@ end
 
 function ChatThrottleLib:OnUpdate()
 	self = ChatThrottleLib;
+	
 	self.OnUpdateDelay = self.OnUpdateDelay + arg1;
 	if(self.OnUpdateDelay < 0.08) then
 		return;
 	end
 	self.OnUpdateDelay = 0;
 	
-	local now = GetTime();
-	local avail = min(MAX_CPS * (now-self.LastDespool), MAX_CPS*0.2);
-	self.LastDespool = now;
-	
+	self:UpdateAvail();
+
+	-- See how many of or priorities have queued messages
 	local n=0;
 	for prioname,Prio in pairs(self.Prio) do
-		if(Prio.Ring.pos or Prio.avail<0) then n=n+1; end
+		if(Prio.Ring.pos or Prio.avail<0) then 
+			n=n+1; 
+		end
 	end
 	
+	-- Anything queued still?
 	if(n<1) then
+		-- Nope. Move spillover bandwidth to global availability gauge and clear self.bQueueing
 		for prioname,Prio in pairs(self.Prio) do
+			self.avail = self.avail + Prio.avail;
 			Prio.avail = 0;
 		end
+		self.bQueueing = false;
 		self.Frame:Hide();
-	else
-	
-		avail=avail/n;
-		
-		for prioname,Prio in pairs(self.Prio) do
-			if(Prio.Ring.pos or Prio.avail<0) then
-				Prio.avail = Prio.avail + avail;
-				if(Prio.Ring.pos and Prio.avail>Prio.Ring.pos[1].nSize) then
-					self:Despool(Prio);
-				end
-			end
-		end
-	
+		return;
 	end
 	
+	-- There's stuff queued. Hand out available bandwidth to priorities as needed and despool their queues
+	local avail= self.avail/n;
+	self.avail = 0;
+	
+	for prioname,Prio in pairs(self.Prio) do
+		if(Prio.Ring.pos or Prio.avail<0) then
+			Prio.avail = Prio.avail + avail;
+			if(Prio.Ring.pos and Prio.avail>Prio.Ring.pos[1].nSize) then
+				self:Despool(Prio);
+			end
+		end
+	end
+
+	-- Expire recycled tables if needed	
 	self.MsgBin:Tidy();
 	self.PipeBin:Tidy();
 end
@@ -278,14 +303,28 @@ function ChatThrottleLib:Enqueue(prioname, pipename, msg)
 	end
 	
 	tinsert(pipe, msg);
+	
+	self.bQueueing = true;
 end
 
 
+
 function ChatThrottleLib:SendChatMessage(prio, prefix,   text, chattype, language, destination)
-	if(not (self and prio and prefix and text and (prio=="NORMAL" or prio=="BULK" or prio=="ALERT") ) ) then
+	if(not (self and prio and prefix and text and self.Prio[prio] ) ) then
 		error('Usage: ChatThrottleLib:SendChatMessage("{BULK||NORMAL||ALERT}", "prefix", "text"[, "chattype"[, "language"[, "destination"]]]', 0);
 	end
 	
+	local nSize = strlen(text) + MSG_OVERHEAD;
+	
+	-- Check if there's room in the global available bandwidth gauge to send directly
+	if(not self.bQueueing and nSize < self:UpdateAvail()) then
+		self.avail = self.avail - nSize;
+		SendChatMessage(text, chattype, language, destination);
+		self.Prio[prio].nTotalSent = self.Prio[prio].nTotalSent + nSize;
+		return;
+	end
+	
+	-- Message needs to be queued
 	msg=self.MsgBin:Get();
 	msg.f=SendChatMessage
 	msg[1]=text;
@@ -293,24 +332,35 @@ function ChatThrottleLib:SendChatMessage(prio, prefix,   text, chattype, languag
 	msg[3]=language;
 	msg[4]=destination;
 	msg.n = 4
-	msg.nSize = strlen(text) + MSG_OVERHEAD;
+	msg.nSize = nSize;
 
 	self:Enqueue(prio, prefix.."/"..chattype.."/"..(destination or ""), msg);
 end
 
 
 function ChatThrottleLib:SendAddonMessage(prio,   prefix, text, chattype)
-	if(not (self and prio and prefix and text and chattype and (prio=="NORMAL" or prio=="BULK" or prio=="ALERT") ) ) then
+	if(not (self and prio and prefix and text and chattype and self.Prio[prio] ) ) then
 		error('Usage: ChatThrottleLib:SendAddonMessage("{BULK||NORMAL||ALERT}", "prefix", "text", "chattype")', 0);
 	end
 	
+	local nSize = strlen(prefix) + 1 + strlen(text) + MSG_OVERHEAD;
+	
+	-- Check if there's room in the global available bandwidth gauge to send directly
+	if(not self.bQueueing and nSize < self:UpdateAvail()) then
+		self.avail = self.avail - nSize;
+		SendAddonMessage(prefix, text, chattype);
+		self.Prio[prio].nTotalSent = self.Prio[prio].nTotalSent + nSize;
+		return;
+	end
+	
+	-- Message needs to be queued
 	msg=self.MsgBin:Get();
 	msg.f=SendAddonMessage;
 	msg[1]=prefix;
 	msg[2]=text;
 	msg[3]=chattype;
 	msg.n = 3
-	msg.nSize = strlen(text) + MSG_OVERHEAD;
+	msg.nSize = nSize;
 	
 	self:Enqueue(prio, prefix.."/"..chattype, msg);
 end
@@ -323,16 +373,14 @@ end
 
 ChatThrottleLib:Init();
 
-
 --[[
 if(WOWB_VER) then
-	function Bleh()
+	local function Bleh()
 		print("SAY: "..GetTime().." "..arg1);
 	end
 	ChatThrottleLib.Frame:SetScript("OnEvent", Bleh);
 	ChatThrottleLib.Frame:RegisterEvent("CHAT_MSG_SAY");
 end
 ]]
-
 
 
