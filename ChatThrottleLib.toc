@@ -9,4 +9,4 @@
 ## SavedVariables: 
 ## SavedVariablesPerCharacter: 
 
-ChatThrottleLib.lua
+ChatThrottleLib.xml

@@ -44,8 +44,13 @@ ChatThrottleLib does:
 
 == How to embed ChatThrottleLib ==
 
+Method 1:
  * Copy ChatThrottleLib.lua into your addon directory 
  * Add "ChatThrottleLib.lua" to your .toc file 
+ 
+Method 2:
+ * Copy the entire ChatThrottleLib folder to your addon
+ * Add "ChatThrottleLib/ChatThrottleLib.xml" to your .toc file
 
 You're done, and can now use ChatThrottleLib:SendChatMessage and ChatThrottleLib:SendAddonMessage to send your messages!
 
@@ -62,4 +67,4 @@ If your addon has a newer version of the library than one that has already been 
  * http://www.wowwiki.com/ChatThrottleLib
  
 
-[Documentation for ChatThrottleLib v6, 2006-07-30]
+[Documentation for ChatThrottleLib v6, 2006-07-31]
