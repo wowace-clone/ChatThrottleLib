@@ -29,7 +29,8 @@ ChatThrottleLib does:
  * Prioritization of messages according to three predefined priorities: 
    "BULK", "NORMAL" and "ALERT"
  * NO queueing of traffic needlessly. No lag introduced until it needs to be.
-    
+ * Adaptive throttling according to traffic bypassing the library
+ * Adaptive throttling according to frame rate
 
 
 == APIs ==

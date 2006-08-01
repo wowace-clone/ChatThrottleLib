@@ -11,9 +11,8 @@
 -- get round-robinned. (Destination only matters for whispers and channels,
 -- obviously)
 --
--- Can optionally install hooks for SendChatMessage and SendAdd[Oo]nMessage 
--- to prevent addons not using this library from overflowing the output rate.
--- Note however that this is somewhat controversional.
+-- Will install hooks for SendChatMessage and SendAdd[Oo]nMessage to measure
+-- bandwidth bypassing the library and use less bandwidth itself.
 --
 --
 -- Fully embeddable library. Just copy this file into your addon directory,
@@ -22,12 +21,14 @@
 -- Can run as a standalone addon also, but, really, just embed it! :-)
 --
 
-local CTL_VERSION = 6
+local CTL_VERSION = 7
 
 local MAX_CPS = 1000			-- 2000 seems to be safe if NOTHING ELSE is happening. let's call it 1000.
 local MSG_OVERHEAD = 40		-- Guesstimate overhead for sending a message; source+dest+chattype+protocolstuff
 
 local BURST = 8000				-- WoW's server buffer seems to be about 32KB. Let's use 25% of it for our lib.
+
+local MIN_FPS = 20					-- Reduce output CPS to half (and don't burst) if FPS drops below this value
 
 if(ChatThrottleLib and ChatThrottleLib.version>=CTL_VERSION) then
 	-- There's already a newer (or same) version loaded. Buh-bye.
@@ -196,7 +197,37 @@ function ChatThrottleLib:Init()
 	self.OnUpdateDelay=0;
 	self.LastAvailUpdate=GetTime();
 	
+	-- Hook SendChatMessage and SendAddonMessage so we can measure unpiped traffic and avoid overloads (v7)
+	if(not self.ORIG_SendChatMessage) then
+		self.ORIG_SendChatMessage = SendChatMessage;
+		SendChatMessage = function(a1,a2,a3,a4) return ChatThrottleLib.Hook_SendChatMessage(a1,a2,a3,a4); end
+		self.ORIG_SendAddonMessage = SendAddonMessage or SendAddOnMessage;
+		SendAddonMessage = function(a1,a2,a3) return ChatThrottleLib.Hook_SendAddonMessage(a1,a2,a3); end
+		if(SendAddOnMessage) then		-- in case Slouken changes his mind...
+			SendAddOnMessage = SendAddonMessage;
+		end
+	end
+	self.nBypass = 0;
 end
+
+
+-----------------------------------------------------------------------
+-- ChatThrottleLib.Hook_SendChatMessage / .Hook_SendAddonMessage
+function ChatThrottleLib.Hook_SendChatMessage(text, chattype, language, destination)
+	local self = ChatThrottleLib;
+	local size = strlen(text or "") + strlen(chattype or "") + strlen(destination or "") + 40;
+	self.avail = self.avail - size;
+	self.nBypass = self.nBypass + size;
+	return self.ORIG_SendChatMessage(text, chattype, language, destination);
+end
+function ChatThrottleLib.Hook_SendAddonMessage(prefix, text, chattype)
+	local self = ChatThrottleLib;
+	local size = strlen(text or "") + strlen(chattype or "") + strlen(prefix or "") + 40;
+	self.avail = self.avail - size;
+	self.nBypass = self.nBypass + size;
+	return self.ORIG_SendChatMessage(text, chattype, language, destination);
+end
+
 
 
 -----------------------------------------------------------------------
@@ -205,8 +236,20 @@ end
 
 function ChatThrottleLib:UpdateAvail()
 	local now = GetTime();
-	self.avail = min(BURST, self.avail + (MAX_CPS * (now-self.LastAvailUpdate)));
+	local newavail = MAX_CPS * (now-self.LastAvailUpdate);
+	
+	if(GetFramerate()<MIN_FPS) then		-- GetFrameRate call takes ~0.002 secs
+		newavail = newavail * 0.5;
+		self.avail = min(MAX_CPS, self.avail + newavail);
+		self.bChoking = true;		-- just for stats
+	else
+		self.avail = min(BURST, self.avail + newavail);
+		self.bChoking = false;
+	end
+	
+	self.avail = max(self.avail, 0-(MAX_CPS*2));	-- Can go negative when someone is eating bandwidth past the lib. but we refuse to stay silent for more than 2 seconds; if they can do it, we can.
 	self.LastAvailUpdate = now;
+	
 	return self.avail;
 end
 
@@ -245,6 +288,10 @@ function ChatThrottleLib:OnUpdate()
 	self.OnUpdateDelay = 0;
 	
 	self:UpdateAvail();
+	
+	if(self.avail<0) then
+		return; -- argh. some bastard is spewing stuff past the lib. just bail early to save cpu.
+	end
 
 	-- See how many of or priorities have queued messages
 	local n=0;
@@ -310,23 +357,25 @@ end
 
 
 function ChatThrottleLib:SendChatMessage(prio, prefix,   text, chattype, language, destination)
-	if(not (self and prio and prefix and text and self.Prio[prio] ) ) then
-		error('Usage: ChatThrottleLib:SendChatMessage("{BULK||NORMAL||ALERT}", "prefix", "text"[, "chattype"[, "language"[, "destination"]]]', 0);
+	if(not (self and prio and text and self.Prio[prio] ) ) then
+		error('Usage: ChatThrottleLib:SendChatMessage("{BULK||NORMAL||ALERT}", "prefix" or nil, "text"[, "chattype"[, "language"[, "destination"]]]', 0);
 	end
+	
+	prefix = prefix or tostring(this);		-- each frame gets its own queue if prefix is not given
 	
 	local nSize = strlen(text) + MSG_OVERHEAD;
 	
 	-- Check if there's room in the global available bandwidth gauge to send directly
 	if(not self.bQueueing and nSize < self:UpdateAvail()) then
 		self.avail = self.avail - nSize;
-		SendChatMessage(text, chattype, language, destination);
+		self.ORIG_SendChatMessage(text, chattype, language, destination);
 		self.Prio[prio].nTotalSent = self.Prio[prio].nTotalSent + nSize;
 		return;
 	end
 	
 	-- Message needs to be queued
 	msg=self.MsgBin:Get();
-	msg.f=SendChatMessage
+	msg.f=self.ORIG_SendChatMessage
 	msg[1]=text;
 	msg[2]=chattype or "SAY";
 	msg[3]=language;
@@ -348,14 +397,14 @@ function ChatThrottleLib:SendAddonMessage(prio,   prefix, text, chattype)
 	-- Check if there's room in the global available bandwidth gauge to send directly
 	if(not self.bQueueing and nSize < self:UpdateAvail()) then
 		self.avail = self.avail - nSize;
-		SendAddonMessage(prefix, text, chattype);
+		self.ORIG_SendAddonMessage(prefix, text, chattype);
 		self.Prio[prio].nTotalSent = self.Prio[prio].nTotalSent + nSize;
 		return;
 	end
 	
 	-- Message needs to be queued
 	msg=self.MsgBin:Get();
-	msg.f=SendAddonMessage;
+	msg.f=self.ORIG_SendAddonMessage;
 	msg[1]=prefix;
 	msg[2]=text;
 	msg[3]=chattype;

@@ -1,8 +1,8 @@
 ## Interface: 11100
 ## Title: ChatThrottleLib
-## Notes: [Version 6] Embeddable chat throttling library with traffic shaping and priorities
+## Notes: [Version 7] Embeddable chat throttling library with traffic shaping and priorities
 ## Author: Mikk of Bloodhoof-EU
-## Version: 6
+## Version: 7
 ## eMail: dpsgnome@mail.com
 ## DefaultState: Enabled
 ## LoadOnDemand: 0
