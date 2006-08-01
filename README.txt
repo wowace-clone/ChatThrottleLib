@@ -40,6 +40,7 @@ ChatThrottleLib does:
  * ChatThrottleLib:SendAddonMessage("prio",    "prefix", "text", "chattype");
  
 "prio" is one of "BULK", "NORMAL" and "ALERT".
+"prefix" in :SendChatMessage() is only used for traffic shaping purposes
 
 
 
@@ -61,11 +62,11 @@ If your addon has a newer version of the library than one that has already been 
 
 == More Information ==
 
+ * Download: http://www.wowinterface.com/downloads/info5207-ChatThrottleLib.html
+
+ * Docs: http://www.wowwiki.com/ChatThrottleLib
+ 
  * SVN: http://svn.wowace.com/root/trunk/ChatThrottleLib
  
- * Download: http://www.wowinterface.com/
 
- * http://www.wowwiki.com/ChatThrottleLib
- 
-
-[Documentation for ChatThrottleLib v6, 2006-07-31]
+[Documentation for ChatThrottleLib v7, 2006-08-01]
