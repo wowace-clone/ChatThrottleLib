@@ -21,7 +21,7 @@
 -- Can run as a standalone addon also, but, really, just embed it! :-)
 --
 
-local CTL_VERSION = 7
+local CTL_VERSION = 8
 
 local MAX_CPS = 1000			-- 2000 seems to be safe if NOTHING ELSE is happening. let's call it 1000.
 local MSG_OVERHEAD = 40		-- Guesstimate overhead for sending a message; source+dest+chattype+protocolstuff
@@ -225,7 +225,7 @@ function ChatThrottleLib.Hook_SendAddonMessage(prefix, text, chattype)
 	local size = strlen(text or "") + strlen(chattype or "") + strlen(prefix or "") + 40;
 	self.avail = self.avail - size;
 	self.nBypass = self.nBypass + size;
-	return self.ORIG_SendChatMessage(text, chattype, language, destination);
+	return self.ORIG_SendAddonMessage(prefix, text, chattype);
 end
 
 
