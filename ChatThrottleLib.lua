@@ -199,12 +199,16 @@ function ChatThrottleLib:Init()
 	
 	-- Hook SendChatMessage and SendAddonMessage so we can measure unpiped traffic and avoid overloads (v7)
 	if(not self.ORIG_SendChatMessage) then
+		--SendChatMessage
 		self.ORIG_SendChatMessage = SendChatMessage;
 		SendChatMessage = function(a1,a2,a3,a4) return ChatThrottleLib.Hook_SendChatMessage(a1,a2,a3,a4); end
-		self.ORIG_SendAddonMessage = SendAddonMessage or SendAddOnMessage;
-		SendAddonMessage = function(a1,a2,a3) return ChatThrottleLib.Hook_SendAddonMessage(a1,a2,a3); end
-		if(SendAddOnMessage) then		-- in case Slouken changes his mind...
-			SendAddOnMessage = SendAddonMessage;
+		--SendAdd[Oo]nMessage
+		if(SendAddonMessage or SendAddOnMessage) then -- v10: don't pretend like it doesn't exist if it doesn't!
+			self.ORIG_SendAddonMessage = SendAddonMessage or SendAddOnMessage;
+			SendAddonMessage = function(a1,a2,a3) return ChatThrottleLib.Hook_SendAddonMessage(a1,a2,a3); end
+			if(SendAddOnMessage) then		-- in case Slouken changes his mind...
+				SendAddOnMessage = SendAddonMessage;
+			end
 		end
 	end
 	self.nBypass = 0;
