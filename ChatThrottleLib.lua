@@ -21,7 +21,7 @@
 -- Can run as a standalone addon also, but, really, just embed it! :-)
 --
 
-local CTL_VERSION = 10
+local CTL_VERSION = 11
 
 local MAX_CPS = 1000			-- 2000 seems to be safe if NOTHING ELSE is happening. let's call it 1000.
 local MSG_OVERHEAD = 40		-- Guesstimate overhead for sending a message; source+dest+chattype+protocolstuff
@@ -194,8 +194,11 @@ function ChatThrottleLib:Init()
 	self.Frame.Show = self.Frame.Show; -- cache for speed
 	self.Frame.Hide = self.Frame.Hide; -- cache for speed
 	self.Frame:SetScript("OnUpdate", self.OnUpdate);
+	self.Frame:SetScript("OnEvent", self.OnEvent);	-- v11: Monitor P_E_W so we can throttle hard for a few seconds
+	self.Frame:RegisterEvent("PLAYER_ENTERING_WORLD");
 	self.OnUpdateDelay=0;
 	self.LastAvailUpdate=GetTime();
+	self.HardThrottlingBeginTime=GetTime();	-- v11: Throttle hard for a few seconds after startup
 	
 	-- Hook SendChatMessage and SendAddonMessage so we can measure unpiped traffic and avoid overloads (v7)
 	if(not self.ORIG_SendChatMessage) then
@@ -241,8 +244,11 @@ end
 function ChatThrottleLib:UpdateAvail()
 	local now = GetTime();
 	local newavail = MAX_CPS * (now-self.LastAvailUpdate);
-	
-	if(GetFramerate()<MIN_FPS) then		-- GetFrameRate call takes ~0.002 secs
+
+	if(now - self.HardThrottlingBeginTime < 5) then
+		-- First 5 seconds after startup/zoning: VERY hard clamping to avoid irritating the server rate limiter, it seems very cranky then
+		self.avail = min(self.avail + (newavail*0.1), MAX_CPS*0.5);
+	elseif(GetFramerate()<MIN_FPS) then		-- GetFrameRate call takes ~0.002 secs
 		newavail = newavail * 0.5;
 		self.avail = min(MAX_CPS, self.avail + newavail);
 		self.bChoking = true;		-- just for stats
@@ -280,6 +286,15 @@ function ChatThrottleLib:Despool(Prio)
 	end
 end
 
+
+function ChatThrottleLib:OnEvent()
+	-- v11: We know that the rate limiter is touchy after login. Assume that it's touch after zoning, too.
+	self = ChatThrottleLib;
+	if(event == "PLAYER_ENTERING_WORLD") then
+		self.HardThrottlingBeginTime=GetTime();	-- Throttle hard for a few seconds after zoning
+		self.avail = 0;
+	end
+end
 
 
 function ChatThrottleLib:OnUpdate()
@@ -426,12 +441,12 @@ end
 
 ChatThrottleLib:Init();
 
---[[
+--[[ WoWBench debugging snippet
 if(WOWB_VER) then
-	local function Bleh()
+	local function SayTimer()
 		print("SAY: "..GetTime().." "..arg1);
 	end
-	ChatThrottleLib.Frame:SetScript("OnEvent", Bleh);
+	ChatThrottleLib.Frame:SetScript("OnEvent", SayTimer);
 	ChatThrottleLib.Frame:RegisterEvent("CHAT_MSG_SAY");
 end
 ]]
