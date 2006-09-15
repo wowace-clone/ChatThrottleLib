@@ -69,4 +69,4 @@ If your addon has a newer version of the library than one that has already been 
  * SVN: http://svn.wowace.com/root/trunk/ChatThrottleLib
  
 
-[Documentation for ChatThrottleLib v11, 2006-08-25]
+[Documentation for ChatThrottleLib v12, 2006-09-14]

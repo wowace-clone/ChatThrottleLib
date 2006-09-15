@@ -21,14 +21,14 @@
 -- Can run as a standalone addon also, but, really, just embed it! :-)
 --
 
-local CTL_VERSION = 11
+local CTL_VERSION = 12
 
-local MAX_CPS = 1000			-- 2000 seems to be safe if NOTHING ELSE is happening. let's call it 1000.
+local MAX_CPS = 800			  -- 2000 seems to be safe if NOTHING ELSE is happening. let's call it 800.
 local MSG_OVERHEAD = 40		-- Guesstimate overhead for sending a message; source+dest+chattype+protocolstuff
 
-local BURST = 8000				-- WoW's server buffer seems to be about 32KB. Let's use 25% of it for our lib.
+local BURST = 4000				-- WoW's server buffer seems to be about 32KB. 8KB should be safe, but seen disconnects on _some_ servers. Using 4KB now.
 
-local MIN_FPS = 20					-- Reduce output CPS to half (and don't burst) if FPS drops below this value
+local MIN_FPS = 20				-- Reduce output CPS to half (and don't burst) if FPS drops below this value
 
 if(ChatThrottleLib and ChatThrottleLib.version>=CTL_VERSION) then
 	-- There's already a newer (or same) version loaded. Buh-bye.
