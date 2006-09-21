@@ -178,7 +178,7 @@ function ChatThrottleLib:Init()
 	end
 	
 	-- v4: total send counters per priority
-	for _,Prio in self.Prio do
+	for _,Prio in pairs(self.Prio) do
 		Prio.nTotalSent = Prio.nTotalSent or 0;
 	end
 	
