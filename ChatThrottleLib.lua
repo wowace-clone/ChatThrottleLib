@@ -21,7 +21,7 @@
 -- Can run as a standalone addon also, but, really, just embed it! :-)
 --
 
-local CTL_VERSION = 12
+local CTL_VERSION = 13
 
 local MAX_CPS = 800			  -- 2000 seems to be safe if NOTHING ELSE is happening. let's call it 800.
 local MSG_OVERHEAD = 40		-- Guesstimate overhead for sending a message; source+dest+chattype+protocolstuff
@@ -40,6 +40,16 @@ end
 if(not ChatThrottleLib) then
 	ChatThrottleLib = {}
 end
+
+local ChatThrottleLib = ChatThrottleLib
+local strlen = strlen
+local setmetatable = setmetatable
+local getn = getn
+local tremove = tremove
+local tinsert = tinsert
+local tostring = tostring
+local GetTime = GetTime
+local format = format
 
 ChatThrottleLib.version=CTL_VERSION;
 
@@ -222,14 +232,14 @@ end
 -- ChatThrottleLib.Hook_SendChatMessage / .Hook_SendAddonMessage
 function ChatThrottleLib.Hook_SendChatMessage(text, chattype, language, destination)
 	local self = ChatThrottleLib;
-	local size = strlen(text or "") + strlen(chattype or "") + strlen(destination or "") + 40;
+	local size = strlen(tostring(text or "")) + strlen(tostring(chattype or "")) + strlen(tostring(destination or "")) + 40;
 	self.avail = self.avail - size;
 	self.nBypass = self.nBypass + size;
 	return self.ORIG_SendChatMessage(text, chattype, language, destination);
 end
 function ChatThrottleLib.Hook_SendAddonMessage(prefix, text, chattype)
 	local self = ChatThrottleLib;
-	local size = strlen(text or "") + strlen(chattype or "") + strlen(prefix or "") + 40;
+	local size = strlen(tostring(text or "")) + strlen(tostring(chattype or "")) + strlen(tostring(prefix or "")) + 40;
 	self.avail = self.avail - size;
 	self.nBypass = self.nBypass + size;
 	return self.ORIG_SendAddonMessage(prefix, text, chattype);
@@ -287,7 +297,7 @@ function ChatThrottleLib:Despool(Prio)
 end
 
 
-function ChatThrottleLib:OnEvent()
+function ChatThrottleLib.OnEvent()
 	-- v11: We know that the rate limiter is touchy after login. Assume that it's touch after zoning, too.
 	self = ChatThrottleLib;
 	if(event == "PLAYER_ENTERING_WORLD") then
@@ -297,7 +307,7 @@ function ChatThrottleLib:OnEvent()
 end
 
 
-function ChatThrottleLib:OnUpdate()
+function ChatThrottleLib.OnUpdate()
 	self = ChatThrottleLib;
 	
 	self.OnUpdateDelay = self.OnUpdateDelay + arg1;
@@ -377,7 +387,7 @@ end
 
 function ChatThrottleLib:SendChatMessage(prio, prefix,   text, chattype, language, destination)
 	if(not (self and prio and text and self.Prio[prio] ) ) then
-		error('Usage: ChatThrottleLib:SendChatMessage("{BULK||NORMAL||ALERT}", "prefix" or nil, "text"[, "chattype"[, "language"[, "destination"]]]', 0);
+		error('Usage: ChatThrottleLib:SendChatMessage("{BULK||NORMAL||ALERT}", "prefix" or nil, "text"[, "chattype"[, "language"[, "destination"]]]', 2);
 	end
 	
 	prefix = prefix or tostring(this);		-- each frame gets its own queue if prefix is not given
@@ -402,11 +412,11 @@ function ChatThrottleLib:SendChatMessage(prio, prefix,   text, chattype, languag
 	msg.n = 4
 	msg.nSize = nSize;
 
-	self:Enqueue(prio, string.format("%s/%s/%s", prefix, chattype, destination or ""), msg);
+	self:Enqueue(prio, format("%s/%s/%s", prefix, chattype, destination or ""), msg);
 end
 
 
-function ChatThrottleLib:SendAddonMessage(prio,   prefix, text, chattype)
+function ChatThrottleLib:SendAddonMessage(prio, prefix, text, chattype)
 	if(not (self and prio and prefix and text and chattype and self.Prio[prio] ) ) then
 		error('Usage: ChatThrottleLib:SendAddonMessage("{BULK||NORMAL||ALERT}", "prefix", "text", "chattype")', 0);
 	end
@@ -430,7 +440,7 @@ function ChatThrottleLib:SendAddonMessage(prio,   prefix, text, chattype)
 	msg.n = 3
 	msg.nSize = nSize;
 	
-	self:Enqueue(prio, string.format("%s/%s", prefix, chattype), msg);
+	self:Enqueue(prio, format("%s/%s", prefix, chattype), msg);
 end
 
 
