@@ -66,7 +66,9 @@ If your addon has a newer version of the library than one that has already been 
 
  * Docs: http://www.wowwiki.com/ChatThrottleLib
  
- * SVN: http://svn.wowace.com/root/trunk/ChatThrottleLib
+ * SVN: http://svn.wowace.com/wowace/trunk/ChatThrottleLib
+ 
+ * beta: http://files.wowace.com/ChatThrottleLib
  
 
-[Documentation for ChatThrottleLib v12, 2006-09-14]
+[Documentation for ChatThrottleLib v14, 2006-04-07]
