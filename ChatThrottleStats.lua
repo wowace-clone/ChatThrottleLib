@@ -23,7 +23,7 @@ CTLStats:SetScript("OnUpdate", function()
 		ChatThrottleLib:UpdateAvail();		-- NOTE THAT THIS NORMALLY DOES NOT GET CALLED PERIODICALLY. Disable this for final testing!
 	
 		local sent = 0;
-		for _,Prio in ChatThrottleLib.Prio do
+		for _,Prio in pairs(ChatThrottleLib.Prio) do
 			sent = sent + Prio.nTotalSent;
 		end
 		

@@ -37,7 +37,7 @@ ChatThrottleLib does:
 
  * ChatThrottleLib:SendChatMessage("prio", "prefix",   "text", "chattype", "language", "destination");
 
- * ChatThrottleLib:SendAddonMessage("prio",    "prefix", "text", "chattype");
+ * ChatThrottleLib:SendAddonMessage("prio",    "prefix", "text", "chattype"[, "target"]);
  
 "prio" is one of "BULK", "NORMAL" and "ALERT".
 "prefix" in :SendChatMessage() is only used for traffic shaping purposes
@@ -71,4 +71,4 @@ If your addon has a newer version of the library than one that has already been 
  * beta: http://files.wowace.com/ChatThrottleLib
  
 
-[Documentation for ChatThrottleLib v14, 2006-04-07]
+[Documentation for ChatThrottleLib v15, 2006-04-08]

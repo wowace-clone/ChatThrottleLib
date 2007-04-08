@@ -2,7 +2,7 @@
 ## Title: ChatThrottleLib
 ## Notes: Embeddable chat throttling library with traffic shaping and priorities
 ## Author: Mikk of Bloodhoof-EU
-## Version: 14
+## Version: 15
 ## eMail: dpsgnome@mail.com
 ## DefaultState: Enabled
 ## LoadOnDemand: 0
