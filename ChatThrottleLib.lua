@@ -21,7 +21,7 @@
 -- Can run as a standalone addon also, but, really, just embed it! :-)
 --
 
-local CTL_VERSION = 15
+local CTL_VERSION = 16
 
 if ChatThrottleLib and ChatThrottleLib.version >= CTL_VERSION then
 	-- There's already a newer (or same) version loaded. Buh-bye.
@@ -210,16 +210,18 @@ function ChatThrottleLib:Init()
 	
 	-- Hook SendChatMessage and SendAddonMessage so we can measure unpiped traffic and avoid overloads (v7)
 	if not self.ORIG_SendChatMessage then
+		-- use secure hooks instead of insecure hooks (v16)
+		self.securelyHooked = true
 		--SendChatMessage
 		self.ORIG_SendChatMessage = SendChatMessage
-		SendChatMessage = function(...)
+		hooksecurefunc("SendChatMessage", function(...)
 			return ChatThrottleLib.Hook_SendChatMessage(...)
-		end
-		--SendAddonMessage
+		end)
 		self.ORIG_SendAddonMessage = SendAddonMessage
-		SendAddonMessage = function(...)
+		--SendAddonMessage
+		hooksecurefunc("SendAddonMessage", function(...)
 			return ChatThrottleLib.Hook_SendAddonMessage(...)
-		end
+		end)
 	end
 	self.nBypass = 0
 end
@@ -232,14 +234,18 @@ function ChatThrottleLib.Hook_SendChatMessage(text, chattype, language, destinat
 	local size = tostring(text or ""):len() + tostring(chattype or ""):len() + tostring(destination or ""):len() + 40
 	self.avail = self.avail - size
 	self.nBypass = self.nBypass + size
-	return self.ORIG_SendChatMessage(text, chattype, language, destination, ...)
+	if not self.securelyHooked then
+		self.ORIG_SendChatMessage(text, chattype, language, destination, ...)
+	end
 end
 function ChatThrottleLib.Hook_SendAddonMessage(prefix, text, chattype, destination, ...)
 	local self = ChatThrottleLib
 	local size = tostring(text or ""):len() + tostring(chattype or ""):len() + tostring(prefix or ""):len() + tostring(destination or ""):len() + 40
 	self.avail = self.avail - size
 	self.nBypass = self.nBypass + size
-	return self.ORIG_SendAddonMessage(prefix, text, chattype, destination, ...)
+	if not self.securelyHooked then
+		self.ORIG_SendAddonMessage(prefix, text, chattype, destination, ...)
+	end
 end
 
 
