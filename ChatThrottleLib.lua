@@ -436,7 +436,7 @@ function ChatThrottleLib:SendAddonMessage(prio, prefix, text, chattype, target)
 	end
 	
 	-- Message needs to be queued
-	msg = self.MsgBin:Get()
+	local msg = self.MsgBin:Get()
 	msg.f = self.ORIG_SendAddonMessage
 	msg[1] = prefix
 	msg[2] = text
