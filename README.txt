@@ -71,4 +71,4 @@ If your addon has a newer version of the library than one that has already been 
  * beta: http://files.wowace.com/ChatThrottleLib
  
 
-[Documentation for ChatThrottleLib v15, 2006-04-08]
+[Documentation for ChatThrottleLib v17, 2006-05-26]

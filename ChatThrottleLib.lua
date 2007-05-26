@@ -21,7 +21,7 @@
 -- Can run as a standalone addon also, but, really, just embed it! :-)
 --
 
-local CTL_VERSION = 16
+local CTL_VERSION = 17
 
 if ChatThrottleLib and ChatThrottleLib.version >= CTL_VERSION then
 	-- There's already a newer (or same) version loaded. Buh-bye.
@@ -240,7 +240,9 @@ function ChatThrottleLib.Hook_SendChatMessage(text, chattype, language, destinat
 end
 function ChatThrottleLib.Hook_SendAddonMessage(prefix, text, chattype, destination, ...)
 	local self = ChatThrottleLib
-	local size = tostring(text or ""):len() + tostring(chattype or ""):len() + tostring(prefix or ""):len() + tostring(destination or ""):len() + 40
+	local size = tostring(text or ""):len() + tostring(prefix or ""):len();
+	assert(size+1<=255, "prefix + text length cannot exceed 254 bytes");
+	size = size + tostring(chattype or ""):len() + tostring(destination or ""):len() + 40
 	self.avail = self.avail - size
 	self.nBypass = self.nBypass + size
 	if not self.securelyHooked then
@@ -425,7 +427,11 @@ function ChatThrottleLib:SendAddonMessage(prio, prefix, text, chattype, target)
 		error('Usage: ChatThrottleLib:SendAddonMessage("{BULK||NORMAL||ALERT}", "prefix", "text", "chattype"[, "target"])', 0)
 	end
 	
-	local nSize = prefix:len() + 1 + text:len() + self.MSG_OVERHEAD
+	local nSize = prefix:len() + 1 + text:len();
+	
+	assert(nSize<=255, "prefix + text length cannot exceed 254 bytes");
+	
+	nSize = nSize + self.MSG_OVERHEAD;
 	
 	-- Check if there's room in the global available bandwidth gauge to send directly
 	if not self.bQueueing and nSize < self:UpdateAvail() then
