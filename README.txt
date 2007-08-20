@@ -52,7 +52,7 @@ Method 1:
  
 Method 2:
  * Copy the entire ChatThrottleLib folder to your addon
- * Add "ChatThrottleLib/ChatThrottleLib.xml" to your .toc file
+ * Add "ChatThrottleLib\ChatThrottleLib.xml" to your .toc file
 
 You're done, and can now use ChatThrottleLib:SendChatMessage and ChatThrottleLib:SendAddonMessage to send your messages!
 
@@ -71,4 +71,4 @@ If your addon has a newer version of the library than one that has already been 
  * beta: http://files.wowace.com/ChatThrottleLib
  
 
-[Documentation for ChatThrottleLib v17, 2006-05-26]
+[Documentation for ChatThrottleLib v18, 2007-08-20]
