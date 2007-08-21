@@ -30,6 +30,7 @@ end
 
 if not ChatThrottleLib then
 	ChatThrottleLib = {}
+	getfenv().ChatThrottleLib = ChatThrottleLib  -- lets it work embedded inside other files where "ChatThrottleLib" is a local (e.g. AceComm-2.0.lua)
 end
 
 ChatThrottleLib.MAX_CPS = 800			  -- 2000 seems to be safe if NOTHING ELSE is happening. let's call it 800.
