@@ -32,6 +32,7 @@ if not _G.ChatThrottleLib then
 	_G.ChatThrottleLib = {}
 end
 
+ChatThrottleLib = _G.ChatThrottleLib  -- in case some addon does "local ChatThrottleLib" above use and we're copypasted (AceComm, sigh)
 local ChatThrottleLib = _G.ChatThrottleLib
 
 ChatThrottleLib.MAX_CPS = 800			  -- 2000 seems to be safe if NOTHING ELSE is happening. let's call it 800.
