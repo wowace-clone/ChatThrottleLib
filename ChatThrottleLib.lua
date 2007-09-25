@@ -23,15 +23,16 @@
 
 local CTL_VERSION = 18
 
-if ChatThrottleLib and ChatThrottleLib.version >= CTL_VERSION then
+if _G.ChatThrottleLib and _G.ChatThrottleLib.version >= CTL_VERSION then
 	-- There's already a newer (or same) version loaded. Buh-bye.
 	return
 end
 
-if not ChatThrottleLib then
-	ChatThrottleLib = {}
-	getfenv().ChatThrottleLib = ChatThrottleLib  -- lets it work embedded inside other files where "ChatThrottleLib" is a local (e.g. AceComm-2.0.lua)
+if not _G.ChatThrottleLib then
+	_G.ChatThrottleLib = {}
 end
+
+local ChatThrottleLib = _G.ChatThrottleLib
 
 ChatThrottleLib.MAX_CPS = 800			  -- 2000 seems to be safe if NOTHING ELSE is happening. let's call it 800.
 ChatThrottleLib.MSG_OVERHEAD = 40		-- Guesstimate overhead for sending a message; source+dest+chattype+protocolstuff
@@ -41,7 +42,6 @@ ChatThrottleLib.BURST = 4000				-- WoW's server buffer seems to be about 32KB. 8
 ChatThrottleLib.MIN_FPS = 20				-- Reduce output CPS to half (and don't burst) if FPS drops below this value
 
 
-local ChatThrottleLib = ChatThrottleLib
 local setmetatable = setmetatable
 local table_remove = table.remove
 local tostring = tostring
